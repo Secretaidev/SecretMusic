@@ -31,7 +31,7 @@ from SecretMusic import LOGGER
 
 API_URL = "https://secretsbotz.site"
 DOWNLOAD_DIR = "downloads"
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "cookies.txt")
+COOKIES_FILE = "cookies.txt"
 
 
 async def download_song(link: str) -> str:

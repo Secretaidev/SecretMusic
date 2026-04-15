@@ -3322,7 +3322,7 @@ from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaVideo
 from SecretMusic import app
 
-REPO_VIDEO = "https://gofile.io/d/NvATx4"
+REPO_VIDEO = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
 
 @app.on_message(filters.command(["repo", "source"]))
 async def send_repo(_, message: Message):

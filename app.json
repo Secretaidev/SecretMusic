@@ -1,7 +1,7 @@
 {
   "name": "Secret Music",
   "description": "A Powerful Telegram Music + Management Bot, written in Python with Pyrogram and Py-Tgcalls.",
-  "logo": "https://gofile.io/d/PIX1kT",
+  "logo": "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretMusic.jpg",
   "keywords": [
     "python3",
     "telegram",
@@ -104,7 +104,7 @@
     },
     "START_IMG_URL": {
       "description": "Image that appears with the /start command",
-      "value": "https://gofile.io/d/PIX1kT",
+      "value": "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretMusic.jpg",
       "required": false
     },
     "LOGGER_CHANNEL_ID": {

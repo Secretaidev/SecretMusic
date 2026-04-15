@@ -26,6 +26,7 @@
 #
 
 
+from SecretMusic import app
 from SecretMusic.misc import SUDOERS
 from SecretMusic.utils.database import get_lang, is_maintenance
 from config import SUPPORT_GROUP
