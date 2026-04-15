@@ -32,6 +32,7 @@ from pyrogram.enums import ChatMemberStatus
 from pyrogram.errors import (
     ChatAdminRequired,
     InviteRequestSent,
+    PeerIdInvalid,
     UserAlreadyParticipant,
     UserNotParticipant,
 )
@@ -158,7 +159,7 @@ def PlayWrapper(command):
                             app.mention, userbot.id, userbot.name, userbot.username
                         )
                     )
-            except UserNotParticipant:
+            except (UserNotParticipant, PeerIdInvalid):
                 if chat_id in links:
                     invitelink = links[chat_id]
                 else:
