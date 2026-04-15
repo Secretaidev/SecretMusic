@@ -66,8 +66,8 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
             "preferredquality": "192",
         }]
     # Cookies deliberately disabled to prevent YouTube shadowban format errors
-    # if os.path.exists(COOKIES_FILE):
-    #     opts["cookiefile"] = COOKIES_FILE
+    if os.path.exists(COOKIES_FILE):
+        opts["cookiefile"] = COOKIES_FILE
 
     try:
         loop = asyncio.get_event_loop()
@@ -318,8 +318,8 @@ class YouTubeAPI:
         if "&" in link:
             link = link.split("&")[0]
         ytdl_opts = {"quiet": True, "extractor_args": {"youtube": {"player_client": ["android_creator", "android", "ios", "tv"]}}}
-        # if os.path.exists(COOKIES_FILE):
-        #     ytdl_opts["cookiefile"] = COOKIES_FILE
+        if os.path.exists(COOKIES_FILE):
+            ytdl_opts["cookiefile"] = COOKIES_FILE
         ydl = yt_dlp.YoutubeDL(ytdl_opts)
         with ydl:
             formats_available = []
