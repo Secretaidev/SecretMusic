@@ -71,15 +71,24 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
 
     try:
         loop = asyncio.get_event_loop()
+        # First attempt with preferred formats
         await loop.run_in_executor(
             None, lambda: yt_dlp.YoutubeDL(opts).download([link])
         )
-        for f in os.listdir(DOWNLOAD_DIR):
-            if f.startswith(video_id):
-                return os.path.join(DOWNLOAD_DIR, f)
-        return None
     except Exception:
-        return None
+        # Fallback attempt with most permissive format selector
+        try:
+            opts["format"] = "ba/b"
+            await loop.run_in_executor(
+                None, lambda: yt_dlp.YoutubeDL(opts).download([link])
+            )
+        except Exception:
+            return None
+
+    for f in os.listdir(DOWNLOAD_DIR):
+        if f.startswith(video_id):
+            return os.path.join(DOWNLOAD_DIR, f)
+    return None
 
 
 async def download_song(link: str) -> str:

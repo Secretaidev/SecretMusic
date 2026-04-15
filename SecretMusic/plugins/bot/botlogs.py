@@ -33,7 +33,7 @@ from config import LOG_GROUP_ID
 from SecretMusic import app
 from SecretMusic.utils.database import add_served_chat, get_assistant
 
-welcome_photo = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
+welcome_photo = "https://files.catbox.moe/72fsio.jpg"
 
 @app.on_message(filters.new_chat_members, group=-10)
 async def join_watcher(_, message):
@@ -43,52 +43,46 @@ async def join_watcher(_, message):
         for members in message.new_chat_members:
             if members.id == app.id:
                 count = await app.get_chat_members_count(chat.id)
-                username = message.chat.username if message.chat.username else "Private Group"
+                username = message.chat.username if message.chat.username else "𝐏ʀɪᴠᴀᴛᴇ 𝐂ʜᴀᴛ"
                 
-                # Try to get invite link if bot has admin rights
-                invite_link = ""
-                try:
-                    if not message.chat.username:  # Only for private groups
-                        link = await app.export_chat_invite_link(message.chat.id)
-                        invite_link = f"\nGroup Link: {link}" if link else ""
-                except:
-                    pass
-                
+                # Enhanced Log Message
                 msg = (
-                    f"Music Bot Added In A New Group\n\n"
-                    f"Chat Name: {message.chat.title}\n"
-                    f"Chat ID: {message.chat.id}\n"
-                    f"Chat Username: @{username}\n"
-                    f"Group Members: {count}\n"
-                    f"Added By: {message.from_user.mention}"
-                    f"{invite_link}"
+                    f"✫ <b><u>#𝐍ᴇᴡ_𝐆ʀᴏᴜᴘ_𝐀ᴅᴅᴇᴅ</u></b> ✫\n\n"
+                    f"<b>𝐂ʜᴀᴛ 𝐓ɪᴛʟᴇ :</b> {message.chat.title}\n"
+                    f"<b>𝐂ʜᴀᴛ 𝐈ᴅ :</b> <code>{message.chat.id}</code>\n"
+                    f"<b>𝐂ʜᴀᴛ 𝐔sᴇʀɴᴀᴍᴇ :</b> @{username}\n"
+                    f"<b>𝐆ʀᴏᴜᴘ 𝐌ᴇᴍʙᴇʀs :</b> {count}\n"
+                    f"<b>𝐀ᴅᴅᴇᴅ 𝐁ʏ :</b> {message.from_user.mention} (<code>{message.from_user.id}</code>)"
                 )
                 
-                buttons = []
-                if message.from_user.id:
-                    buttons.append([InlineKeyboardButton("Added By", 
-                                    url=f"tg://openmessage?user_id={message.from_user.id}")])
+                # Fetch invite link for private groups
+                if not message.chat.username:
+                    try:
+                        link = await app.export_chat_invite_link(message.chat.id)
+                        if link:
+                            msg += f"\n<b>𝐆ʀᴏᴜᴘ 𝐋ɪɴᴋ :</b> {link}"
+                    except:
+                        pass
                 
                 await app.send_photo(
                     LOG_GROUP_ID,
                     photo=welcome_photo,
-                    caption=msg,
-                    reply_markup=InlineKeyboardMarkup(buttons) if buttons else None
+                    caption=msg
                 )
                 
                 await add_served_chat(message.chat.id)
-                if username:
+                if username != "𝐏ʀɪᴠᴀᴛᴇ 𝐂ʜᴀᴛ":
                     await userbot.join_chat(f"@{username}")
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error in join_watcher: {e}")
 
 
 from pyrogram.types import Message
 from SecretMusic.utils.database import delete_served_chat, get_assistant
 
 photo = [
-    "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png",
+    "https://files.catbox.moe/72fsio.jpg",
 ]
 
 
@@ -100,14 +94,21 @@ async def on_left_chat_member(_, message: Message):
         left_chat_member = message.left_chat_member
         if left_chat_member and left_chat_member.id == (await app.get_me()).id:
             remove_by = (
-                message.from_user.mention if message.from_user else "𝐔ɴᴋɴᴏᴡɴ 𝐔sᴇʀ"
+                f"{message.from_user.mention} (<code>{message.from_user.id}</code>)" 
+                if message.from_user else "𝐔ɴᴋɴᴏᴡɴ 𝐔sᴇʀ"
             )
             title = message.chat.title
             username = (
                 f"@{message.chat.username}" if message.chat.username else "𝐏ʀɪᴠᴀᴛᴇ 𝐂ʜᴀᴛ"
             )
             chat_id = message.chat.id
-            left = f"✫ <b><u>#𝐋ᴇғᴛ_𝐆ʀᴏᴜᴘ</u></b> ✫\n\n𝐂ʜᴀᴛ 𝐓ɪᴛʟᴇ : {title}\n\n𝐂ʜᴀᴛ 𝐈ᴅ : {chat_id}\n\n𝐑ᴇᴍᴏᴠᴇᴅ 𝐁ʏ : {remove_by}\n\n𝐁ᴏᴛ : @{app.username}"
+            left = (
+                f"✫ <b><u>#𝐋ᴇғᴛ_𝐆ʀᴏᴜᴘ</u></b> ✫\n\n"
+                f"<b>𝐂ʜᴀᴛ 𝐓ɪᴛʟᴇ :</b> {title}\n"
+                f"<b>𝐂ʜᴀᴛ 𝐈ᴅ :</b> <code>{chat_id}</code>\n"
+                f"<b>𝐑ᴇᴍᴏᴠᴇᴅ 𝐁ʏ :</b> {remove_by}\n"
+                f"<b>𝐁ᴏᴛ :</b> @{app.username}"
+            )
             await app.send_photo(LOG_GROUP_ID, photo=random.choice(photo), caption=left)
             await delete_served_chat(chat_id)
             await userbot.leave_chat(chat_id)

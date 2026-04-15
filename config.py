@@ -56,18 +56,18 @@ STRING5 = os.getenv("STRING_SESSION5", None)
 
 AUTO_LEAVING_ASSISTANT = bool(os.getenv("AUTO_LEAVING_ASSISTANT", False))
 
-START_IMG_URL = os.getenv("START_IMG_URL", "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png")
-PING_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-PLAYLIST_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-STATS_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-TELEGRAM_AUDIO_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-TELEGRAM_VIDEO_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-STREAM_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-SOUNCLOUD_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-YOUTUBE_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-SPOTIFY_ARTIST_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-SPOTIFY_ALBUM_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
-SPOTIFY_PLAYLIST_IMG_URL = "https://cdn.jsdelivr.net/gh/Secretaidev/SecretMusic@main/SecretMusic/assets/SecretAI.png"
+START_IMG_URL = os.getenv("START_IMG_URL", "https://files.catbox.moe/72fsio.jpg")
+PING_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+PLAYLIST_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+STATS_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+TELEGRAM_AUDIO_URL = "https://files.catbox.moe/72fsio.jpg"
+TELEGRAM_VIDEO_URL = "https://files.catbox.moe/72fsio.jpg"
+STREAM_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+SOUNCLOUD_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+YOUTUBE_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+SPOTIFY_ARTIST_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+SPOTIFY_ALBUM_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
+SPOTIFY_PLAYLIST_IMG_URL = "https://files.catbox.moe/72fsio.jpg"
 
 BANNED_USERS = filters.user()
 adminlist = {}
