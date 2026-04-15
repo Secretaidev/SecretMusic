@@ -316,7 +316,7 @@ class YouTubeAPI:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        ytdl_opts = {"quiet": True}
+        ytdl_opts = {"quiet": True, "extractor_args": {"youtube": {"player_client": ["android", "web"]}}}
         if os.path.exists(COOKIES_FILE):
             ytdl_opts["cookiefile"] = COOKIES_FILE
         ydl = yt_dlp.YoutubeDL(ytdl_opts)
