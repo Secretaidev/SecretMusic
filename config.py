@@ -56,18 +56,18 @@ STRING5 = os.getenv("STRING_SESSION5", None)
 
 AUTO_LEAVING_ASSISTANT = bool(os.getenv("AUTO_LEAVING_ASSISTANT", False))
 
-START_IMG_URL = os.getenv("START_IMG_URL", "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretMusic.jpg")
-PING_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-PLAYLIST_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-STATS_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-TELEGRAM_AUDIO_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-TELEGRAM_VIDEO_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-STREAM_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-SOUNCLOUD_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-YOUTUBE_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-SPOTIFY_ARTIST_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-SPOTIFY_ALBUM_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
-SPOTIFY_PLAYLIST_IMG_URL = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
+START_IMG_URL = os.getenv("START_IMG_URL", "https://gofile.io/d/PIX1kT")
+PING_IMG_URL = "https://gofile.io/d/PIX1kT"
+PLAYLIST_IMG_URL = "https://gofile.io/d/PIX1kT"
+STATS_IMG_URL = "https://gofile.io/d/PIX1kT"
+TELEGRAM_AUDIO_URL = "https://gofile.io/d/PIX1kT"
+TELEGRAM_VIDEO_URL = "https://gofile.io/d/PIX1kT"
+STREAM_IMG_URL = "https://gofile.io/d/PIX1kT"
+SOUNCLOUD_IMG_URL = "https://gofile.io/d/PIX1kT"
+YOUTUBE_IMG_URL = "https://gofile.io/d/PIX1kT"
+SPOTIFY_ARTIST_IMG_URL = "https://gofile.io/d/PIX1kT"
+SPOTIFY_ALBUM_IMG_URL = "https://gofile.io/d/PIX1kT"
+SPOTIFY_PLAYLIST_IMG_URL = "https://gofile.io/d/PIX1kT"
 
 BANNED_USERS = filters.user()
 adminlist = {}
