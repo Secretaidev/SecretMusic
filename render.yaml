@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: secret-music
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      pip install -r requirements.txt
+    startCommand: python3 -m SecretMusic
+    autoDeploy: true
+
+    envVars:
+      API_ID: 
+        sync: false
+      API_HASH: 
+        sync: false
+      BOT_TOKEN:
+        sync: false
+      MONGO_DB_URI: 
+        sync: false
+      OWNER_ID:
+        value: 8335505032
+      OWNER_USERNAME:
+        value: its_me_secret
+      BOT_USERNAME:
+        value: SecretMusicsBot
+      UPSTREAM_REPO:
+        value: https://github.com/Secretaidev/SecretMusic
+      STRING_SESSION:
+        sync: false
+      GIT_TOKEN:
+        sync: false
+      HEROKU_API_KEY:
+        sync: false
+      HEROKU_APP_NAME:
+        sync: false
+      LOG_GROUP_ID:
+        sync: false
+      SUPPORT_GROUP:
+        value: https://t.me/song_assistant
+      SUPPORT_CHANNEL:
+        value: https://t.me/secretsbotz
+      INSTAGRAM:
+        value: https://t.me/its_me_secret
+      YOUTUBE:
+        value: https://t.me/secretsbotz
+      GITHUB:
+        value: https://github.com/Secretaidev
+      DONATE:
+        value: https://t.me/secretsbotz
+      START_IMG_URL:
+        sync: false
