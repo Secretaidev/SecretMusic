@@ -51,7 +51,6 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
     opts = {
-        "format": "bestaudio/best" if audio_only else "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
         "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         "quiet": True,

@@ -23,6 +23,11 @@
 
 import asyncio
 import importlib
+import os
+
+# Auto-update yt-dlp to latest on startup to bypass YouTube format signature errors and clear cache
+os.system("pip install -U yt-dlp")
+os.system("yt-dlp --rm-cache-dir")
 from pyrogram import idle
 from pyrogram.types import BotCommand
 from pytgcalls.exceptions import NoActiveGroupCall
