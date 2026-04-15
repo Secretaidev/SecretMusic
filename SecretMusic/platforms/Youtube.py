@@ -53,7 +53,7 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
     opts = {
         "format": "bestaudio/best" if audio_only else "best[height<=720]",
         "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "extractor_args": {"youtube": {"player_client": ["android_creator", "android", "ios", "tv"]}},
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -317,7 +317,7 @@ class YouTubeAPI:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        ytdl_opts = {"quiet": True, "extractor_args": {"youtube": {"player_client": ["android", "web"]}}}
+        ytdl_opts = {"quiet": True, "extractor_args": {"youtube": {"player_client": ["android_creator", "android", "ios", "tv"]}}}
         # if os.path.exists(COOKIES_FILE):
         #     ytdl_opts["cookiefile"] = COOKIES_FILE
         ydl = yt_dlp.YoutubeDL(ytdl_opts)
