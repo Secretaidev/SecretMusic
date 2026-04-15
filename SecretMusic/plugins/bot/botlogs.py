@@ -33,7 +33,7 @@ from config import LOG_GROUP_ID
 from SecretMusic import app
 from SecretMusic.utils.database import add_served_chat, get_assistant
 
-welcome_photo = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretMusic.jpg"
+welcome_photo = "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png"
 
 @app.on_message(filters.new_chat_members, group=-10)
 async def join_watcher(_, message):
@@ -88,11 +88,7 @@ from pyrogram.types import Message
 from SecretMusic.utils.database import delete_served_chat, get_assistant
 
 photo = [
-    "https://telegra.ph/file/1949480f01355b4e87d26.jpg",
-    "https://telegra.ph/file/3ef2cc0ad2bc548bafb30.jpg",
-    "https://telegra.ph/file/a7d663cd2de689b811729.jpg",
-    "https://telegra.ph/file/6f19dc23847f5b005e922.jpg",
-    "https://telegra.ph/file/2973150dd62fd27a3a6ba.jpg",
+    "https://raw.githubusercontent.com/Secretaidev/SecretMusic/main/SecretMusic/assets/SecretAI.png",
 ]
 
 
