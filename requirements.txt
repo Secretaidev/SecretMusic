@@ -1,4 +1,4 @@
-﻿pyrofork
+pyrofork
 gTTS
 aiofiles
 aiohttp
@@ -32,8 +32,9 @@ youtube-search-python
 py-yt-search
 yt-dlp
 # ===========================================
-# ©️ 2025 Nand Yaduwanshi , aka @NoxxOP
-# 🔗 GitHub : https://github.com/NoxxOP/SecretMusic
-# 📢 Telegram Channel : https://t.me/ShrutiBots
+# ©️ 2025 𝐒𝐄𝐂𝐑𝐄𝐓 (@its_me_secret)
+# 🔗 GitHub : https://github.com/Secretaidev/SecretMusic
+# 📢 Telegram Channel : https://t.me/secretsbotz
 # ===========================================
+
 

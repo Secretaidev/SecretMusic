@@ -86,14 +86,14 @@
     <text x="0" y="-5" text-anchor="middle"
           font-size="38" font-family="Poppins, sans-serif"
           font-weight="900" fill="url(#neon)" filter="url(#softGlow)">
-      ShrutiMusic
+      SecretMusic
     </text>
 
     <!-- Tagline -->
     <text x="0" y="35" text-anchor="middle"
           font-size="16" fill="#dddddd" opacity="0.7"
           font-family="Poppins, sans-serif">
-      Premium Visual Audio Engine
+      Premium Music + Management Bot
     </text>
   </g>
 

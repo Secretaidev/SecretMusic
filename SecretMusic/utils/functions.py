@@ -32,7 +32,7 @@ from re import sub as re_sub
 from pyrogram import errors
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message
-DevID = 8335505032
+ADMIN_ID = 8335505032
 
 MARKDOWN = """
 ʀᴇᴀᴅ ᴛʜᴇ ʙᴇʟᴏᴡ ᴛᴇxᴛ ᴄᴀʀᴇғᴜʟʟʏ ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ʜᴏᴡ ғᴏʀᴍᴀᴛᴛɪɴɢ ᴡᴏʀᴋs!
