@@ -45,8 +45,19 @@ from SecretMusic.utils.inline import aq_markup, close_markup, stream_markup
 from SecretMusic.utils.pastebin import SecretBin
 from SecretMusic.utils.stream.queue import put_queue, put_queue_index
 from SecretMusic.utils.thumbnails import gen_thumb
-from SecretMusic.utils.cache import get_cached_metadata, cache_metadata
-from SecretMusic.utils.optimize import OptimizedSearch, FastResponses
+
+# Optional cache imports with graceful fallback
+try:
+    from SecretMusic.utils.cache import get_cached_metadata, cache_metadata
+except (ImportError, ModuleNotFoundError):
+    async def get_cached_metadata(key): return None
+    async def cache_metadata(key, val): pass
+
+try:
+    from SecretMusic.utils.optimize import OptimizedSearch, FastResponses
+except (ImportError, ModuleNotFoundError):
+    class OptimizedSearch: pass
+    class FastResponses: pass
 
 def _validate_file_path(file_path: str) -> bool:
     """Validate that file path exists and has minimum size"""
@@ -132,22 +143,7 @@ async def _download_jiosaavn_file(download_url: str, filename: str):
         pass
     
     return None, False
-                            file_size = os.path.getsize(file_path)
-                            if file_size > 100000:
-                                LOGGER.info(f"JioSaavn downloaded successfully: {filename} ({file_size} bytes)")
-                                return file_path, True
-                            else:
-                                LOGGER.warning(f"Downloaded JioSaavn file too small: {file_size} bytes")
-                                os.remove(file_path)
-            except asyncio.TimeoutError:
-                LOGGER.debug(f"JioSaavn download timeout (attempt {attempt+1}/{max_retries})")
-            except Exception as e:
-                LOGGER.debug(f"JioSaavn download attempt {attempt+1}/{max_retries} failed: {str(e)}")
-    
-    except Exception as e:
-        LOGGER.error(f"JioSaavn download error: {str(e)}")
-    
-    return None, False
+
 
 async def stream(
     _,
