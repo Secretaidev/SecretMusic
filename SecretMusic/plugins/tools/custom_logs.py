@@ -10,7 +10,7 @@ from SecretMusic.misc import SUDOERS
 LOG_IMAGE = "https://i.ibb.co/vvkm3C0j/IMG-20260415-021910-937.jpg"
 
 
-@app.on_message(filters.command(["setlogwelcome", "setlogleft", "setlogdm"]) & filters.user(SUDOERS))
+@app.on_message(filters.command(["setlogwelcome", "setlogleft", "setlogdm"]) & SUDOERS)
 async def set_logs(_, message: Message):
     if len(message.command) < 2:
         return await message.reply_text(
@@ -25,7 +25,7 @@ async def set_logs(_, message: Message):
     await message.reply_text(f"✅ <b>Custom {log_type} log message updated!</b>")
 
 
-@app.on_message(filters.command("resetlogs") & filters.user(SUDOERS))
+@app.on_message(filters.command("resetlogs") & SUDOERS)
 async def reset_logs(_, message: Message):
     await reset_log_messages()
     await message.reply_text("✅ <b>All log messages reset to default!</b>")
