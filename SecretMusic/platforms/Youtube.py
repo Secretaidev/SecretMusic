@@ -50,17 +50,13 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
     if "youtube.com" not in link and "youtu.be" not in link:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
-    # Multiple format attempts in order of preference
+    # Optimize: Only 2 format attempts to reduce server load
     format_attempts = [
-        "bestaudio[ext=m4a]/bestaudio/ba/b",  # Primary
-        "ba/b",                                 # Secondary
-        "best",                                 # Tertiary - fallback to best available
-        "worst",                                # Last resort
+        "bestaudio[ext=m4a]/bestaudio/ba/b",  # Primary - best audio format
+        "best",                                 # Fallback - anything that works
     ] if audio_only else [
         "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
-        "best[ext=mp4]/best",
         "best",
-        "worst",
     ]
 
     try:
@@ -73,21 +69,22 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
             opts = {
                 "format": format_option,
                 "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-                "extractor_args": {"youtube": {"player_client": ["ios", "web_safari", "mweb"]}},
-                "quiet": False,
+                "extractor_args": {"youtube": {"player_client": ["mweb"]}},  # Only mweb to reduce overhead
+                "quiet": True,  # Reduce logging overhead
                 "nocheckcertificate": True,
                 "geo_bypass": True,
-                "no_warnings": False,
+                "no_warnings": True,  # Reduce logging
                 "noplaylist": True,
-                "retries": 3,
-                "fragment_retries": 3,
-                "socket_timeout": 10,
+                "retries": 1,  # Reduced from 3
+                "fragment_retries": 1,  # Reduced from 3
+                "socket_timeout": 8,  # Reduced from 10
+                "skip_unavailable_fragments": True,
             }
             if audio_only:
                 opts["postprocessors"] = [{
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
-                    "preferredquality": "192",
+                    "preferredquality": "128",  # Reduced bitrate to save bandwidth
                 }]
             
             await loop.run_in_executor(
@@ -98,14 +95,11 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
             for f in os.listdir(DOWNLOAD_DIR):
                 if f.startswith(video_id):
                     result = os.path.join(DOWNLOAD_DIR, f)
-                    if os.path.exists(result) and os.path.getsize(result) > 0:
-                        LOGGER.info(f"Successfully downloaded {video_id} with format: {format_option}")
+                    if os.path.exists(result) and os.path.getsize(result) > 100000:
                         return result
-        except Exception as e:
-            LOGGER.debug(f"Format {format_option} failed for {video_id}: {str(e)}")
+        except Exception:
             continue
 
-    LOGGER.warning(f"All download attempts failed for video {video_id}")
     return None
 
 
@@ -120,44 +114,7 @@ async def download_song(link: str) -> str:
     if os.path.exists(file_path):
         return file_path
 
-    # Try API first
-    try:
-        async with aiohttp.ClientSession() as session:
-            params = {"url": video_id, "type": "audio"}
-            async with session.get(
-                f"{API_URL}/download",
-                params=params,
-                timeout=aiohttp.ClientTimeout(total=7)
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    download_token = data.get("download_token")
-                    if download_token:
-                        stream_url = f"{API_URL}/stream/{video_id}?type=audio&token={download_token}"
-                        async with session.get(
-                            stream_url,
-                            timeout=aiohttp.ClientTimeout(total=300)
-                        ) as file_response:
-                            if file_response.status == 302:
-                                redirect_url = file_response.headers.get('Location')
-                                if redirect_url:
-                                    async with session.get(redirect_url) as final_response:
-                                        if final_response.status == 200:
-                                            with open(file_path, "wb") as f:
-                                                async for chunk in final_response.content.iter_chunked(16384):
-                                                    f.write(chunk)
-                                            if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                                                return file_path
-                            elif file_response.status == 200:
-                                with open(file_path, "wb") as f:
-                                    async for chunk in file_response.content.iter_chunked(16384):
-                                        f.write(chunk)
-                                if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                                    return file_path
-    except Exception:
-        pass
-
-    # Fallback to yt-dlp
+    # Fallback to yt-dlp directly - API is often unreliable
     return await _ytdl_download(link, audio_only=True)
 
 
@@ -172,44 +129,7 @@ async def download_video(link: str) -> str:
     if os.path.exists(file_path):
         return file_path
 
-    # Try API first
-    try:
-        async with aiohttp.ClientSession() as session:
-            params = {"url": video_id, "type": "video"}
-            async with session.get(
-                f"{API_URL}/download",
-                params=params,
-                timeout=aiohttp.ClientTimeout(total=7)
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    download_token = data.get("download_token")
-                    if download_token:
-                        stream_url = f"{API_URL}/stream/{video_id}?type=video&token={download_token}"
-                        async with session.get(
-                            stream_url,
-                            timeout=aiohttp.ClientTimeout(total=300)
-                        ) as file_response:
-                            if file_response.status == 302:
-                                redirect_url = file_response.headers.get('Location')
-                                if redirect_url:
-                                    async with session.get(redirect_url) as final_response:
-                                        if final_response.status == 200:
-                                            with open(file_path, "wb") as f:
-                                                async for chunk in final_response.content.iter_chunked(16384):
-                                                    f.write(chunk)
-                                            if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                                                return file_path
-                            elif file_response.status == 200:
-                                with open(file_path, "wb") as f:
-                                    async for chunk in file_response.content.iter_chunked(16384):
-                                        f.write(chunk)
-                                if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                                    return file_path
-    except Exception:
-        pass
-
-    # Fallback to yt-dlp
+    # Fallback to yt-dlp directly - API is often unreliable
     return await _ytdl_download(link, audio_only=False)
 
 

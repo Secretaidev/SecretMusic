@@ -27,6 +27,7 @@
 
 
 import aiohttp
+import asyncio
 import urllib.parse
 import os
 from random import randint
@@ -44,6 +45,8 @@ from SecretMusic.utils.inline import aq_markup, close_markup, stream_markup
 from SecretMusic.utils.pastebin import SecretBin
 from SecretMusic.utils.stream.queue import put_queue, put_queue_index
 from SecretMusic.utils.thumbnails import gen_thumb
+from SecretMusic.utils.cache import get_cached_metadata, cache_metadata
+from SecretMusic.utils.optimize import OptimizedSearch, FastResponses
 
 def _validate_file_path(file_path: str) -> bool:
     """Validate that file path exists and has minimum size"""
@@ -59,51 +62,92 @@ def _validate_file_path(file_path: str) -> bool:
 
 async def get_jiosaavn_link(query: str):
     """Get and download JioSaavn song. Returns local file path and True on success."""
+    if not query or query.strip() == "":
+        return None, None
+    
+    # Clean up query once
+    query = query.replace(' lyrical', '').replace(' music video', '').replace(' audio', '').strip()
+    query_encoded = urllib.parse.quote(query)
+    
     try:
-        query = urllib.parse.quote(query.replace(' lyrical', '').replace(' music video', '').replace(' audio', '').strip())
+        # Only use one reliable endpoint to reduce load
+        endpoint = f"https://jiosaavn-api-privatecvc2.vercel.app/search/songs?query={query_encoded}"
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://jiosaavn-api-privatecvc2.vercel.app/search/songs?query={query}", timeout=10) as resp:
+            async with session.get(endpoint, timeout=10) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     results = data.get("data", {}).get("results", [])
+                    
                     if results and len(results) > 0:
-                        # Get song name and download URL
                         song_data = results[0]
-                        song_name = song_data.get("song", "song").replace(" ", "_")[:50]
+                        song_name = song_data.get("song", query)[:40].replace(" ", "_")
                         download_urls = song_data.get("downloadUrl", [])
                         if download_urls:
-                            download_url = download_urls[-1]["link"]
+                            download_url = download_urls[-1].get("link") if isinstance(download_urls[-1], dict) else download_urls[-1]
                             return await _download_jiosaavn_file(download_url, song_name)
-    except Exception as e:
+    except Exception:
         pass
+    
     return None, None
 
 
 async def _download_jiosaavn_file(download_url: str, filename: str):
     """Download JioSaavn audio file locally"""
+    if not download_url:
+        return None, False
+    
     try:
         os.makedirs("downloads", exist_ok=True)
-        file_path = os.path.join("downloads", f"jiosaavn_{filename}.mp3")
+        file_path = os.path.join("downloads", f"js_{filename[:30]}.mp3")
         
-        # Check if already downloaded
+        # Check cache first (avoid re-downloading)
         if os.path.exists(file_path) and os.path.getsize(file_path) > 100000:
             return file_path, True
         
+        # Download with minimal overhead
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         async with aiohttp.ClientSession() as session:
-            async with session.get(download_url, timeout=30, allow_redirects=True) as resp:
+            async with session.get(
+                download_url, 
+                timeout=aiohttp.ClientTimeout(total=45),
+                allow_redirects=True,
+                headers=headers
+            ) as resp:
                 if resp.status == 200:
-                    # Download with proper headers to bypass restrictions
+                    # Quick size check
+                    if resp.content_length and resp.content_length < 100000:
+                        return None, False
+                    
+                    # Stream download directly to file
                     with open(file_path, 'wb') as f:
-                        async for chunk in resp.content.iter_chunked(8192):
+                        async for chunk in resp.content.iter_chunked(32768):
+                            if f.tell() > 5000000:  # Max 5MB
+                                break
                             f.write(chunk)
                     
-                    # Verify file was downloaded properly
+                    # Verify downloaded file
                     if os.path.exists(file_path) and os.path.getsize(file_path) > 100000:
                         return file_path, True
-    except Exception as e:
+    except Exception:
         pass
     
-    return None, None
+    return None, False
+                            file_size = os.path.getsize(file_path)
+                            if file_size > 100000:
+                                LOGGER.info(f"JioSaavn downloaded successfully: {filename} ({file_size} bytes)")
+                                return file_path, True
+                            else:
+                                LOGGER.warning(f"Downloaded JioSaavn file too small: {file_size} bytes")
+                                os.remove(file_path)
+            except asyncio.TimeoutError:
+                LOGGER.debug(f"JioSaavn download timeout (attempt {attempt+1}/{max_retries})")
+            except Exception as e:
+                LOGGER.debug(f"JioSaavn download attempt {attempt+1}/{max_retries} failed: {str(e)}")
+    
+    except Exception as e:
+        LOGGER.error(f"JioSaavn download error: {str(e)}")
+    
+    return None, False
 
 async def stream(
     _,
@@ -170,38 +214,56 @@ async def stream(
                     file_path, direct = await YouTube.download(
                         vidid, mystic, video=status, videoid=True
                     )
-                except Exception:
+                except Exception as e:
+                    from SecretMusic import LOGGER
+                    LOGGER.debug(f"YouTube download failed for {vidid}: {str(e)}")
                     pass
                 
                 # JioSaavn Fallback on full title
                 if not file_path:
                     try:
                         file_path, direct = await get_jiosaavn_link(title)
-                    except Exception:
+                    except Exception as e:
+                        from SecretMusic import LOGGER
+                        LOGGER.debug(f"JioSaavn fallback (full title) failed for '{title}': {str(e)}")
                         pass
                 
                 # JioSaavn Fallback on first word
                 if not file_path:
                     try:
-                        file_path, direct = await get_jiosaavn_link(title.split()[0])
-                    except Exception:
+                        first_word = title.split()[0] if title else ""
+                        if first_word:
+                            file_path, direct = await get_jiosaavn_link(first_word)
+                    except Exception as e:
+                        from SecretMusic import LOGGER
+                        LOGGER.debug(f"JioSaavn fallback (first word) failed for '{title}': {str(e)}")
                         pass
                 
                 # Skip this video if all sources fail
                 if not file_path:
-                    raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
+                    from SecretMusic import LOGGER
+                    LOGGER.error(f"All download sources failed for '{title}' (Video: {video})")
+                    raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**\n\n📝 **Try again or contact support if issue persists.**")
                 
                 # Validate file before streaming
                 if not _validate_file_path(file_path):
+                    from SecretMusic import LOGGER
+                    LOGGER.error(f"Invalid file: {file_path}")
                     raise AssistantErr(_["play_14"] + "\n\n⚠️ **Downloaded file is invalid or corrupted!**")
                 
-                await SecretCall.join_call(
-                    chat_id,
-                    original_chat_id,
-                    file_path,
-                    video=status,
-                    image=thumbnail,
-                )
+                try:
+                    await SecretCall.join_call(
+                        chat_id,
+                        original_chat_id,
+                        file_path,
+                        video=status,
+                        image=thumbnail,
+                    )
+                except Exception as e:
+                    from SecretMusic import LOGGER
+                    LOGGER.error(f"Failed to join voice call for '{title}' (Video: {video}): {str(e)}")
+                    raise AssistantErr(_["call_8"] if "NoActiveGroupCall" in str(type(e)) else _["general_2"].format(type(e).__name__))
+                
                 await put_queue(
                     chat_id,
                     original_chat_id,
@@ -269,29 +331,41 @@ async def stream(
                 vidid, mystic, videoid=True, video=status
             )
         except Exception as e:
+            from SecretMusic import LOGGER
             # YouTube download failed, will try JioSaavn fallback
+            LOGGER.debug(f"YouTube download failed for {vidid}: {str(e)}")
             pass
         
         # If YouTube fails, try JioSaavn
         if not file_path:
             try:
                 file_path, direct = await get_jiosaavn_link(title)
-            except Exception:
+            except Exception as e:
+                from SecretMusic import LOGGER
+                LOGGER.debug(f"JioSaavn fallback (full title) failed for '{title}': {str(e)}")
                 pass
         
         # If full title fails on JioSaavn, try first word
         if not file_path:
             try:
-                file_path, direct = await get_jiosaavn_link(title.split()[0])
-            except Exception:
+                first_word = title.split()[0] if title else ""
+                if first_word:
+                    file_path, direct = await get_jiosaavn_link(first_word)
+            except Exception as e:
+                from SecretMusic import LOGGER
+                LOGGER.debug(f"JioSaavn fallback (first word) failed for '{title}': {str(e)}")
                 pass
         
         # If all else fails, raise error
         if not file_path:
-            raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
+            from SecretMusic import LOGGER
+            LOGGER.error(f"All download sources failed for '{title}' (Video: {video})")
+            raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**\n\n📝 **Try again or contact support if issue persists.**")
         
         # Validate file before streaming
         if not _validate_file_path(file_path):
+            from SecretMusic import LOGGER
+            LOGGER.error(f"Invalid file: {file_path}")
             raise AssistantErr(_["play_14"] + "\n\n⚠️ **Downloaded file is invalid or corrupted!**")
 
         if await is_active_chat(chat_id):
@@ -316,13 +390,20 @@ async def stream(
         else:
             if not forceplay:
                 db[chat_id] = []
-            await SecretCall.join_call(
-                chat_id,
-                original_chat_id,
-                file_path,
-                video=status,
-                image=thumbnail,
-            )
+            
+            try:
+                await SecretCall.join_call(
+                    chat_id,
+                    original_chat_id,
+                    file_path,
+                    video=status,
+                    image=thumbnail,
+                )
+            except Exception as e:
+                from SecretMusic import LOGGER
+                LOGGER.error(f"Failed to join voice call for '{title}' (Video: {video}): {str(e)}")
+                raise AssistantErr(_["call_8"] if "NoActiveGroupCall" in str(type(e)) else _["general_2"].format(type(e).__name__))
+            
             await put_queue(
                 chat_id,
                 original_chat_id,

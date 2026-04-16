@@ -51,6 +51,7 @@ async def put_queue(
         duration_in_seconds = time_to_seconds(duration) - 3
     except:
         duration_in_seconds = 0
+    
     put = {
         "title": title,
         "dur": duration,
@@ -63,15 +64,28 @@ async def put_queue(
         "seconds": duration_in_seconds,
         "played": 0,
     }
+    
+    # Check for duplicates in the queue
+    check = db.get(chat_id)
+    if check:
+        # Remove duplicate entries with same vidid (skip the currently playing song at index 0)
+        for i in range(1, len(check)):
+            if check[i].get("vidid") == vidid or check[i].get("title").lower() == title.lower():
+                check.pop(i)
+                break
+    
     if forceplay:
-        check = db.get(chat_id)
         if check:
             check.insert(0, put)
         else:
             db[chat_id] = []
             db[chat_id].append(put)
     else:
-        db[chat_id].append(put)
+        if check:
+            db[chat_id].append(put)
+        else:
+            db[chat_id] = [put]
+    
     autoclean.append(file)
 
 
