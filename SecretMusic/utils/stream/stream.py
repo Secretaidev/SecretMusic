@@ -118,16 +118,35 @@ async def stream(
                 if not forceplay:
                     db[chat_id] = []
                 status = True if video else None
+                
+                file_path = None
+                direct = False
+                
                 try:
                     file_path, direct = await YouTube.download(
                         vidid, mystic, video=status, videoid=True
                     )
-                except:
-                    file_path, direct = await get_jiosaavn_link(title)
+                except Exception:
+                    pass
+                
+                # JioSaavn Fallback on full title
                 if not file_path:
-                    file_path, direct = await get_jiosaavn_link(title.split()[0])
-                    if not file_path:
-                        raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
+                    try:
+                        file_path, direct = await get_jiosaavn_link(title)
+                    except Exception:
+                        pass
+                
+                # JioSaavn Fallback on first word
+                if not file_path:
+                    try:
+                        file_path, direct = await get_jiosaavn_link(title.split()[0])
+                    except Exception:
+                        pass
+                
+                # Skip this video if all sources fail
+                if not file_path:
+                    raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
+                
                 await SecretCall.join_call(
                     chat_id,
                     original_chat_id,
@@ -193,17 +212,35 @@ async def stream(
         if current_queue is not None and len(current_queue) >= 10:
             return await app.send_message(original_chat_id, "You can't add more than 10 songs to the queue.")
 
+        file_path = None
+        direct = False
+        
         try:
+            # Try YouTube download first
             file_path, direct = await YouTube.download(
                 vidid, mystic, videoid=True, video=status
             )
-        except:
-            # JioSaavn Fallback
-            file_path, direct = await get_jiosaavn_link(title)
+        except Exception as e:
+            # YouTube download failed, will try JioSaavn fallback
+            pass
+        
+        # If YouTube fails, try JioSaavn
         if not file_path:
-            file_path, direct = await get_jiosaavn_link(title.split()[0])
-            if not file_path:
-                raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
+            try:
+                file_path, direct = await get_jiosaavn_link(title)
+            except Exception:
+                pass
+        
+        # If full title fails on JioSaavn, try first word
+        if not file_path:
+            try:
+                file_path, direct = await get_jiosaavn_link(title.split()[0])
+            except Exception:
+                pass
+        
+        # If all else fails, raise error
+        if not file_path:
+            raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
 
         if await is_active_chat(chat_id):
             await put_queue(

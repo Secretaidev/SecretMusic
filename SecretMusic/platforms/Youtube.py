@@ -50,51 +50,62 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
     if "youtube.com" not in link and "youtu.be" not in link:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
-    opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/ba/b",
-        "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-        "extractor_args": {"youtube": {"player_client": ["ios", "web_safari"]}},
-        "quiet": True,
-        "nocheckcertificate": True,
-        "geo_bypass": True,
-        "no_warnings": True,
-        "noplaylist": True,
-        "retries": 5,
-        "fragment_retries": 5,
-    }
-    if audio_only:
-        opts["postprocessors"] = [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }]
-    # Disabled cookies.txt because they often cause 'Request format not available' or shadowbans on VPS
-    # if os.path.exists(COOKIES_FILE):
-    #     opts["cookiefile"] = COOKIES_FILE
+    # Multiple format attempts in order of preference
+    format_attempts = [
+        "bestaudio[ext=m4a]/bestaudio/ba/b",  # Primary
+        "ba/b",                                 # Secondary
+        "best",                                 # Tertiary - fallback to best available
+        "worst",                                # Last resort
+    ] if audio_only else [
+        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "best[ext=mp4]/best",
+        "best",
+        "worst",
+    ]
 
     try:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.get_event_loop()
-            
-        # First attempt with preferred formats
-        await loop.run_in_executor(
-            None, lambda: yt_dlp.YoutubeDL(opts).download([link])
-        )
-    except Exception:
-        # Fallback attempt with most permissive format selector
-        try:
-            opts["format"] = "ba/b"
-            await loop.run_in_executor(
-                None, lambda: yt_dlp.YoutubeDL(opts).download([link])
-            )
-        except Exception:
-            return None
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.get_event_loop()
 
-    for f in os.listdir(DOWNLOAD_DIR):
-        if f.startswith(video_id):
-            return os.path.join(DOWNLOAD_DIR, f)
+    for format_option in format_attempts:
+        try:
+            opts = {
+                "format": format_option,
+                "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
+                "extractor_args": {"youtube": {"player_client": ["ios", "web_safari", "mweb"]}},
+                "quiet": False,
+                "nocheckcertificate": True,
+                "geo_bypass": True,
+                "no_warnings": False,
+                "noplaylist": True,
+                "retries": 3,
+                "fragment_retries": 3,
+                "socket_timeout": 10,
+            }
+            if audio_only:
+                opts["postprocessors"] = [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }]
+            
+            await loop.run_in_executor(
+                None, lambda o=opts, l=link: yt_dlp.YoutubeDL(o).download([l])
+            )
+            
+            # Check if download was successful
+            for f in os.listdir(DOWNLOAD_DIR):
+                if f.startswith(video_id):
+                    result = os.path.join(DOWNLOAD_DIR, f)
+                    if os.path.exists(result) and os.path.getsize(result) > 0:
+                        LOGGER.info(f"Successfully downloaded {video_id} with format: {format_option}")
+                        return result
+        except Exception as e:
+            LOGGER.debug(f"Format {format_option} failed for {video_id}: {str(e)}")
+            continue
+
+    LOGGER.warning(f"All download attempts failed for video {video_id}")
     return None
 
 
