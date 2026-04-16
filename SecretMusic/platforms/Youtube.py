@@ -102,7 +102,6 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
     # Multiple format attempts with increasing permissiveness
-    # Note: Reduced from 4 to 3 attempts - non-recoverable errors now detected early
     format_attempts = [
         "bestaudio[ext=m4a]/bestaudio/ba/b" if audio_only else "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
         "ba/b" if audio_only else "best[ext=mp4]/best",
@@ -114,79 +113,96 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
     except RuntimeError:
         loop = asyncio.get_event_loop()
 
-    for attempt_num, format_option in enumerate(format_attempts, 1):
-        try:
-            opts = {
-                "format": format_option,
-                "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-                "extractor_args": {"youtube": {"player_client": ["mweb", "web_safari"]}},  # Removed ios - doesn't support cookies
-                "quiet": False,
-                "nocheckcertificate": True,
-                "geo_bypass": True,
-                "no_warnings": False,
-                "noplaylist": True,
-                "retries": config.DOWNLOAD_RETRIES,
-                "fragment_retries": config.FRAGMENT_RETRIES,
-                "socket_timeout": config.DOWNLOAD_TIMEOUT,
-                "skip_unavailable_fragments": False,  # Get complete audio
-            }
-            
-            # Enable cookies for better access
-            if os.path.exists(COOKIES_FILE) and config.ENABLE_COOKIE_AUTH:
-                opts["cookiefile"] = COOKIES_FILE
-            
-            if audio_only:
-                opts["postprocessors"] = [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": config.PREFERRED_AUDIO_FORMAT,
-                    "preferredquality": str(config.MAX_AUDIO_BITRATE),
-                }]
-            
-            LOGGER(__name__).info(f"Download attempt {attempt_num}/{len(format_attempts)} for {video_id}")
-            
-            await loop.run_in_executor(
-                None, lambda o=opts, l=link: yt_dlp.YoutubeDL(o).download([l])
-            )
-            
-            # Check if download was successful
-            for f in os.listdir(DOWNLOAD_DIR):
-                if f.startswith(video_id):
-                    result_path = os.path.join(DOWNLOAD_DIR, f)
-                    file_size = os.path.getsize(result_path) if os.path.exists(result_path) else 0
-                    
-                    if file_size >= config.MIN_FILE_SIZE:
-                        LOGGER(__name__).info(f"✅ Downloaded {video_id} ({file_size / 1024 / 1024:.2f}MB)")
-                        return result_path
-                    else:
-                        LOGGER(__name__).warning(f"Downloaded file too small ({file_size} bytes), retrying...")
-                        try:
-                            os.remove(result_path)
-                        except:
-                            pass
-                        continue
-                            
-        except Exception as e:
-            error_msg = str(e)
-            
-            # Check for non-recoverable errors that should trigger immediate fallback
-            # These errors won't be fixed by retrying different formats
-            if any(keyword in error_msg.lower() for keyword in [
-                "only images available",
-                "gvs po token",
-                "signature solving failed",
-                "n challenge solving failed",
-            ]):
-                LOGGER(__name__).warning(
-                    f"Non-recoverable YouTube error for {video_id}: {error_msg[:100]}... "
-                    f"Skipping retries, falling back to JioSaavn"
-                )
-                return None  # Signal immediate fallback
-            
-            LOGGER(__name__).debug(f"Format {format_option} failed for {video_id}: {error_msg}")
-            continue
+    # Try with cookies first, if they're valid
+    cookies_to_try = []
+    if os.path.exists(COOKIES_FILE) and config.ENABLE_COOKIE_AUTH:
+        cookies_to_try.append(COOKIES_FILE)
+    cookies_to_try.append(None)  # Fallback to no cookies
 
-    error_msg = f"All download attempts failed for {video_id}"
-    LOGGER(__name__).error(error_msg)
+    for cookie_file in cookies_to_try:
+        for attempt_num, format_option in enumerate(format_attempts, 1):
+            try:
+                opts = {
+                    "format": format_option,
+                    "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
+                    "extractor_args": {"youtube": {"player_client": ["mweb", "web_safari"]}},
+                    "quiet": False,
+                    "nocheckcertificate": True,
+                    "geo_bypass": True,
+                    "no_warnings": False,
+                    "noplaylist": True,
+                    "retries": config.DOWNLOAD_RETRIES,
+                    "fragment_retries": config.FRAGMENT_RETRIES,
+                    "socket_timeout": config.DOWNLOAD_TIMEOUT,
+                    "skip_unavailable_fragments": False,
+                }
+                
+                # Only add cookies if they're available and we haven't detected them as invalid
+                if cookie_file:
+                    opts["cookiefile"] = cookie_file
+                
+                if audio_only:
+                    opts["postprocessors"] = [{
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": config.PREFERRED_AUDIO_FORMAT,
+                        "preferredquality": str(config.MAX_AUDIO_BITRATE),
+                    }]
+                
+                logger = LOGGER(__name__)
+                cookie_mode = f"(with cookies)" if cookie_file else "(no cookies)"
+                logger.info(f"Download attempt {attempt_num}/3 for {video_id} {cookie_mode}")
+                
+                await loop.run_in_executor(
+                    None, lambda o=opts, l=link: yt_dlp.YoutubeDL(o).download([l])
+                )
+                
+                # Check if download was successful
+                for f in os.listdir(DOWNLOAD_DIR):
+                    if f.startswith(video_id):
+                        result_path = os.path.join(DOWNLOAD_DIR, f)
+                        file_size = os.path.getsize(result_path) if os.path.exists(result_path) else 0
+                        
+                        if file_size >= config.MIN_FILE_SIZE:
+                            LOGGER(__name__).info(f"✅ Downloaded {video_id} ({file_size / 1024 / 1024:.2f}MB)")
+                            return result_path
+                        else:
+                            LOGGER(__name__).warning(f"File too small ({file_size} bytes), retrying...")
+                            try:
+                                os.remove(result_path)
+                            except:
+                                pass
+                            continue
+                            
+            except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Check for non-recoverable errors
+                non_recoverable_keywords = [
+                    "only images available",
+                    "gvs po token",
+                    "signature solving failed",
+                    "n challenge solving failed",
+                ]
+                
+                # Check for cookie-related errors
+                cookie_invalid_keywords = [
+                    "cookies are no longer valid",
+                    "not a bot",
+                    "sign in to confirm",
+                ]
+                
+                if any(keyword in error_msg for keyword in non_recoverable_keywords):
+                    LOGGER(__name__).warning(f"Non-recoverable error for {video_id}, skipping retries")
+                    break  # Skip remaining format attempts
+                
+                if any(keyword in error_msg for keyword in cookie_invalid_keywords):
+                    LOGGER(__name__).warning(f"Cookies invalid, switching to cookieless mode")
+                    break  # Move to next cookie_file (None)
+                
+                LOGGER(__name__).debug(f"Format {format_option} failed: {error_msg[:60]}")
+                continue
+
+    LOGGER(__name__).error(f"All download attempts failed for {video_id}")
     return None
 
 
