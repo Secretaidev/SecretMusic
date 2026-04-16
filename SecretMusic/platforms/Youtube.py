@@ -51,13 +51,14 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
     opts = {
-        "format": "bestaudio/best" if audio_only else "best[height<=720]",
+        "format": "bestaudio[ext=m4a]/bestaudio/ba/b",
         "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
         "extractor_args": {"youtube": {"player_client": ["android_creator", "android", "ios", "tv"]}},
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        "retries": 3,
+        "retries": 5,
+        "fragment_retries": 5,
     }
     if audio_only:
         opts["postprocessors"] = [{
@@ -65,9 +66,9 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }]
-    # Cookies deliberately disabled to prevent YouTube shadowban format errors
-    if os.path.exists(COOKIES_FILE):
-        opts["cookiefile"] = COOKIES_FILE
+    # Disabled cookies.txt because they often cause 'Request format not available' or shadowbans on VPS
+    # if os.path.exists(COOKIES_FILE):
+    #     opts["cookiefile"] = COOKIES_FILE
 
     try:
         try:

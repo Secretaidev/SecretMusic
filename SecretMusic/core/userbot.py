@@ -71,7 +71,10 @@ class Userbot(Client):
             await self.one.start()
             assistants.append(1)
             try:
-                await self.one.send_message(config.LOG_GROUP_ID, "Assistant Started")
+                await self.one.send_message(
+                    config.LOG_GROUP_ID,
+                    f"✅ **Assistant Started Successfully**\n\n**Name:** {self.one.me.mention}\n**ID:** `{self.one.me.id}`\n**Username:** @{self.one.me.username}"
+                )
             except:
                 LOGGER(__name__).error(
                     "Assistant Account 1 has failed to access the log Group. Make sure that you have added your assistant to your log group and promoted as admin!"
