@@ -53,8 +53,10 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
     opts = {
         "format": "bestaudio[ext=m4a]/bestaudio/ba/b",
         "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-        "extractor_args": {"youtube": {"player_client": ["android_creator", "android", "ios", "tv"]}},
+        "extractor_args": {"youtube": {"player_client": ["ios", "web_safari"]}},
         "quiet": True,
+        "nocheckcertificate": True,
+        "geo_bypass": True,
         "no_warnings": True,
         "noplaylist": True,
         "retries": 5,
