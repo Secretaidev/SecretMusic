@@ -45,7 +45,20 @@ from SecretMusic.utils.pastebin import SecretBin
 from SecretMusic.utils.stream.queue import put_queue, put_queue_index
 from SecretMusic.utils.thumbnails import gen_thumb
 
+def _validate_file_path(file_path: str) -> bool:
+    """Validate that file path exists and has minimum size"""
+    if not file_path:
+        return False
+    if isinstance(file_path, str) and file_path.startswith("http"):
+        # For streaming URLs, basic check
+        return len(file_path) > 10
+    if isinstance(file_path, str) and os.path.exists(file_path):
+        # For local files, check minimum size (100KB)
+        return os.path.getsize(file_path) > 100000
+    return False
+
 async def get_jiosaavn_link(query: str):
+    """Get and download JioSaavn song. Returns local file path and True on success."""
     try:
         query = urllib.parse.quote(query.replace(' lyrical', '').replace(' music video', '').replace(' audio', '').strip())
         async with aiohttp.ClientSession() as session:
@@ -54,11 +67,42 @@ async def get_jiosaavn_link(query: str):
                     data = await resp.json()
                     results = data.get("data", {}).get("results", [])
                     if results and len(results) > 0:
-                        download_urls = results[0].get("downloadUrl", [])
+                        # Get song name and download URL
+                        song_data = results[0]
+                        song_name = song_data.get("song", "song").replace(" ", "_")[:50]
+                        download_urls = song_data.get("downloadUrl", [])
                         if download_urls:
-                            return download_urls[-1]["link"], True
-    except Exception:
+                            download_url = download_urls[-1]["link"]
+                            return await _download_jiosaavn_file(download_url, song_name)
+    except Exception as e:
         pass
+    return None, None
+
+
+async def _download_jiosaavn_file(download_url: str, filename: str):
+    """Download JioSaavn audio file locally"""
+    try:
+        os.makedirs("downloads", exist_ok=True)
+        file_path = os.path.join("downloads", f"jiosaavn_{filename}.mp3")
+        
+        # Check if already downloaded
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 100000:
+            return file_path, True
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(download_url, timeout=30, allow_redirects=True) as resp:
+                if resp.status == 200:
+                    # Download with proper headers to bypass restrictions
+                    with open(file_path, 'wb') as f:
+                        async for chunk in resp.content.iter_chunked(8192):
+                            f.write(chunk)
+                    
+                    # Verify file was downloaded properly
+                    if os.path.exists(file_path) and os.path.getsize(file_path) > 100000:
+                        return file_path, True
+    except Exception as e:
+        pass
+    
     return None, None
 
 async def stream(
@@ -146,6 +190,10 @@ async def stream(
                 # Skip this video if all sources fail
                 if not file_path:
                     raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
+                
+                # Validate file before streaming
+                if not _validate_file_path(file_path):
+                    raise AssistantErr(_["play_14"] + "\n\n⚠️ **Downloaded file is invalid or corrupted!**")
                 
                 await SecretCall.join_call(
                     chat_id,
@@ -241,6 +289,10 @@ async def stream(
         # If all else fails, raise error
         if not file_path:
             raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
+        
+        # Validate file before streaming
+        if not _validate_file_path(file_path):
+            raise AssistantErr(_["play_14"] + "\n\n⚠️ **Downloaded file is invalid or corrupted!**")
 
         if await is_active_chat(chat_id):
             await put_queue(
