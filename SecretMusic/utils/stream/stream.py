@@ -160,8 +160,20 @@ async def stream(
 ):
     if not result:
         return
+    
+    # Add reliability check
+    try:
+        from SecretMusic.utils.reliability import error_recovery, rate_limiter
+    except (ImportError, ModuleNotFoundError):
+        error_recovery = None
+        rate_limiter = None
+    
     if forceplay:
-        await SecretCall.force_stop_stream(chat_id)
+        try:
+            await SecretCall.force_stop_stream(chat_id)
+        except Exception:
+            pass  # Continue even if force_stop fails
+    
     if streamtype == "playlist":
         msg = f"{_['play_19']}\n\n"
         count = 0
@@ -176,8 +188,8 @@ async def stream(
                     thumbnail,
                     vidid,
                 ) = await YouTube.details(search, False if spotify else True)
-            except:
-                continue
+            except Exception as e:
+                continue  # Skip this video if details fail
             if str(duration_min) == "None":
                 continue
             if duration_sec > config.DURATION_LIMIT:
