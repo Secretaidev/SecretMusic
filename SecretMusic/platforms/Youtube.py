@@ -102,11 +102,11 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
     # Multiple format attempts with increasing permissiveness
+    # Note: Reduced from 4 to 3 attempts - non-recoverable errors now detected early
     format_attempts = [
         "bestaudio[ext=m4a]/bestaudio/ba/b" if audio_only else "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
         "ba/b" if audio_only else "best[ext=mp4]/best",
         "best" if audio_only else "best",
-        "worst" if audio_only else "worst",
     ]
 
     try:
@@ -119,7 +119,7 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
             opts = {
                 "format": format_option,
                 "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-                "extractor_args": {"youtube": {"player_client": ["mweb", "web_safari", "ios"]}},
+                "extractor_args": {"youtube": {"player_client": ["mweb", "web_safari"]}},  # Removed ios - doesn't support cookies
                 "quiet": False,
                 "nocheckcertificate": True,
                 "geo_bypass": True,
@@ -167,6 +167,21 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
                             
         except Exception as e:
             error_msg = str(e)
+            
+            # Check for non-recoverable errors that should trigger immediate fallback
+            # These errors won't be fixed by retrying different formats
+            if any(keyword in error_msg.lower() for keyword in [
+                "only images available",
+                "gvs po token",
+                "signature solving failed",
+                "n challenge solving failed",
+            ]):
+                LOGGER(__name__).warning(
+                    f"Non-recoverable YouTube error for {video_id}: {error_msg[:100]}... "
+                    f"Skipping retries, falling back to JioSaavn"
+                )
+                return None  # Signal immediate fallback
+            
             LOGGER(__name__).debug(f"Format {format_option} failed for {video_id}: {error_msg}")
             continue
 
