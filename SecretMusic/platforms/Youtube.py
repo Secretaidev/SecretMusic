@@ -21,6 +21,7 @@
 import asyncio
 import os
 import re
+import time
 from typing import Union, Tuple, Optional
 from pathlib import Path
 
@@ -38,9 +39,35 @@ from SecretMusic.utils.exceptions import (
 )
 import config
 
+# Browser-like headers to avoid bot detection
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate",
+    "DNT": "1",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+}
+
 API_URL = "https://secretsbotz.site"
 DOWNLOAD_DIR = "downloads"
 COOKIES_FILE = "cookies.txt"
+
+
+async def _wait_with_backoff(attempt: int, max_backoff: int = 60, base_wait: int = 5) -> None:
+    """Exponential backoff for rate limiting.
+    
+    Args:
+        attempt: Current attempt number (0-indexed)
+        max_backoff: Maximum wait time in seconds
+        base_wait: Base wait time in seconds
+    """
+    if not config.ENABLE_EXPONENTIAL_BACKOFF:
+        return
+    
+    wait_time = min(base_wait * (2 ** attempt), max_backoff)
+    LOGGER(__name__).warning(f"Rate limited. Waiting {wait_time}s before retry (attempt {attempt + 1})...")
+    await asyncio.sleep(wait_time)
 
 
 def _cleanup_old_files(max_age_hours: int = 24) -> None:
@@ -72,7 +99,14 @@ def _cleanup_old_files(max_age_hours: int = 24) -> None:
 
 
 async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
-    """Download from YouTube using yt-dlp with multi-format fallback.
+    """Download from YouTube using yt-dlp with multi-format fallback and rate limit handling.
+    
+    Features:
+    - GVS PO Token support for mweb client
+    - Exponential backoff for rate limiting (HTTP 429)
+    - Browser-like headers to bypass bot detection
+    - Cookie authentication with fallback
+    - Multiple format attempts
     
     Args:
         link: YouTube URL or video ID
@@ -86,8 +120,6 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
         raise DownloadError("Invalid video ID", video_id)
     
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-    
-    # Periodic cleanup
     _cleanup_old_files(max_age_hours=24)
     
     ext = "mp3" if audio_only else "mp4"
@@ -95,13 +127,12 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
     
     # Return cached file if exists and valid
     if os.path.exists(file_path) and os.path.getsize(file_path) >= config.MIN_FILE_SIZE:
-        LOGGER(__name__).info(f"Using cached file for {video_id}")
+        LOGGER(__name__).info(f"✓ Using cached file for {video_id}")
         return file_path
 
     if "youtube.com" not in link and "youtu.be" not in link:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
-    # Multiple format attempts with increasing permissiveness
     format_attempts = [
         "bestaudio[ext=m4a]/bestaudio/ba/b" if audio_only else "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
         "ba/b" if audio_only else "best[ext=mp4]/best",
@@ -113,31 +144,38 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
     except RuntimeError:
         loop = asyncio.get_event_loop()
 
-    # Try with cookies first, if they're valid
     cookies_to_try = []
     if os.path.exists(COOKIES_FILE) and config.ENABLE_COOKIE_AUTH:
         cookies_to_try.append(COOKIES_FILE)
-    cookies_to_try.append(None)  # Fallback to no cookies
+    cookies_to_try.append(None)
 
     for cookie_file in cookies_to_try:
+        rate_limit_attempts = 0
+        
         for attempt_num, format_option in enumerate(format_attempts, 1):
             try:
+                # Build extractor args with GVS PO Token if available
+                extractor_args = {"youtube": {"player_client": ["mweb", "web_safari"]}}
+                if config.GVS_PO_TOKEN:
+                    extractor_args["youtube"]["po_token"] = config.GVS_PO_TOKEN
+                
                 opts = {
                     "format": format_option,
                     "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-                    "extractor_args": {"youtube": {"player_client": ["mweb", "web_safari"]}},
+                    "extractor_args": extractor_args,
                     "quiet": False,
                     "nocheckcertificate": True,
                     "geo_bypass": True,
+                    "geo_bypass_country": "US",
                     "no_warnings": False,
                     "noplaylist": True,
                     "retries": config.DOWNLOAD_RETRIES,
                     "fragment_retries": config.FRAGMENT_RETRIES,
                     "socket_timeout": config.DOWNLOAD_TIMEOUT,
                     "skip_unavailable_fragments": False,
+                    "http_headers": BROWSER_HEADERS if config.USE_BROWSER_HEADERS else {},
                 }
                 
-                # Only add cookies if they're available and we haven't detected them as invalid
                 if cookie_file:
                     opts["cookiefile"] = cookie_file
                 
@@ -150,8 +188,9 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
                 
                 logger = LOGGER(__name__)
                 cookie_mode = f"(with cookies)" if cookie_file else "(no cookies)"
-                logger.info(f"Download attempt {attempt_num}/3 for {video_id} {cookie_mode}")
+                logger.info(f"🔄 Download attempt {attempt_num}/3 for {video_id} {cookie_mode}")
                 
+                # Run download with executor
                 await loop.run_in_executor(
                     None, lambda o=opts, l=link: yt_dlp.YoutubeDL(o).download([l])
                 )
@@ -174,35 +213,54 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
                             continue
                             
             except Exception as e:
-                error_msg = str(e).lower()
+                error_msg = str(e)
+                error_lower = error_msg.lower()
                 
-                # Check for non-recoverable errors
+                # Rate limit handling
+                if "429" in error_msg or "too many requests" in error_lower:
+                    rate_limit_attempts += 1
+                    if rate_limit_attempts <= config.RATE_LIMIT_RETRY_ATTEMPTS:
+                        backoff_attempt = min(rate_limit_attempts - 1, 4)
+                        await _wait_with_backoff(backoff_attempt, config.RATE_LIMIT_MAX_BACKOFF, config.RATE_LIMIT_WAIT_BASE)
+                        continue  # Retry same format
+                    else:
+                        LOGGER(__name__).warning(f"Rate limited too many times, skipping to next cookie mode")
+                        break
+                
+                # Non-recoverable errors
                 non_recoverable_keywords = [
                     "only images available",
-                    "gvs po token",
                     "signature solving failed",
                     "n challenge solving failed",
                 ]
                 
-                # Check for cookie-related errors
+                # Cookie-related errors
                 cookie_invalid_keywords = [
                     "cookies are no longer valid",
                     "not a bot",
                     "sign in to confirm",
                 ]
                 
-                if any(keyword in error_msg for keyword in non_recoverable_keywords):
-                    LOGGER(__name__).warning(f"Non-recoverable error for {video_id}, skipping retries")
-                    break  # Skip remaining format attempts
+                # Geo-blocking errors
+                geo_block_keywords = [
+                    "not available",
+                    "geographically",
+                    "country",
+                ]
                 
-                if any(keyword in error_msg for keyword in cookie_invalid_keywords):
-                    LOGGER(__name__).warning(f"Cookies invalid, switching to cookieless mode")
-                    break  # Move to next cookie_file (None)
+                if any(keyword in error_lower for keyword in non_recoverable_keywords):
+                    LOGGER(__name__).debug(f"Non-recoverable: {error_msg[:80]}")
+                    break
                 
-                LOGGER(__name__).debug(f"Format {format_option} failed: {error_msg[:60]}")
+                if any(keyword in error_lower for keyword in cookie_invalid_keywords):
+                    LOGGER(__name__).warning(f"Cookies invalid, switching mode")
+                    break
+                
+                # For other errors, try next format
+                LOGGER(__name__).debug(f"Format {attempt_num} failed: {error_msg[:60]}")
                 continue
 
-    LOGGER(__name__).error(f"All download attempts failed for {video_id}")
+    LOGGER(__name__).error(f"❌ All download attempts failed for {video_id}")
     return None
 
 
@@ -367,29 +425,43 @@ class YouTubeAPI:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        ytdl_opts = {"quiet": True, "extractor_args": {"youtube": {"player_client": ["android_creator", "android", "ios", "tv"]}}}
+        
+        extractor_args = {"youtube": {"player_client": ["android_creator", "android", "ios", "tv"]}}
+        if config.GVS_PO_TOKEN:
+            extractor_args["youtube"]["po_token"] = config.GVS_PO_TOKEN
+        
+        ytdl_opts = {
+            "quiet": True,
+            "extractor_args": extractor_args,
+            "http_headers": BROWSER_HEADERS if config.USE_BROWSER_HEADERS else {},
+        }
         if os.path.exists(COOKIES_FILE):
             ytdl_opts["cookiefile"] = COOKIES_FILE
-        ydl = yt_dlp.YoutubeDL(ytdl_opts)
-        with ydl:
-            formats_available = []
-            r = ydl.extract_info(link, download=False)
-            for format in r["formats"]:
-                try:
-                    if "dash" not in str(format["format"]).lower():
-                        formats_available.append(
-                            {
-                                "format": format["format"],
-                                "filesize": format.get("filesize"),
-                                "format_id": format["format_id"],
-                                "ext": format["ext"],
-                                "format_note": format["format_note"],
-                                "yturl": link,
-                            }
-                        )
-                except:
-                    continue
-        return formats_available, link
+        
+        try:
+            ydl = yt_dlp.YoutubeDL(ytdl_opts)
+            with ydl:
+                formats_available = []
+                r = ydl.extract_info(link, download=False)
+                for format in r["formats"]:
+                    try:
+                        if "dash" not in str(format["format"]).lower():
+                            formats_available.append(
+                                {
+                                    "format": format["format"],
+                                    "filesize": format.get("filesize"),
+                                    "format_id": format["format_id"],
+                                    "ext": format["ext"],
+                                    "format_note": format["format_note"],
+                                    "yturl": link,
+                                }
+                            )
+                    except:
+                        continue
+            return formats_available, link
+        except Exception as e:
+            LOGGER(__name__).error(f"Failed to fetch formats: {e}")
+            return [], link
 
     async def slider(self, link: str, query_type: int, videoid: Union[bool, str] = None):
         if videoid:

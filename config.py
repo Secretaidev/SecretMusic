@@ -64,6 +64,16 @@ CACHE_DURATION = int(os.getenv("CACHE_DURATION", 3600))  # 1 hour
 DISC_CLEANUP_INTERVAL = int(os.getenv("DISC_CLEANUP_INTERVAL", 21600))  # 6 hours
 MAX_CACHE_SIZE = int(os.getenv("MAX_CACHE_SIZE", 5368709120))  # 5GB
 
+# ═══════════════════════════════════════════════════════════════
+# YouTube Authentication & Anti-Bot Evasion (v2.1.2+)
+# ═══════════════════════════════════════════════════════════════
+GVS_PO_TOKEN = os.getenv("GVS_PO_TOKEN", None)  # Extract from https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide
+USE_USER_AGENT = os.getenv("USE_USER_AGENT", "true").lower() == "true"
+USE_BROWSER_HEADERS = os.getenv("USE_BROWSER_HEADERS", "true").lower() == "true"
+RATE_LIMIT_WAIT_BASE = int(os.getenv("RATE_LIMIT_WAIT_BASE", 5))  # seconds
+RATE_LIMIT_MAX_BACKOFF = int(os.getenv("RATE_LIMIT_MAX_BACKOFF", 60))  # max wait time
+RATE_LIMIT_RETRY_ATTEMPTS = int(os.getenv("RATE_LIMIT_RETRY_ATTEMPTS", 5))
+
 # Feature Flags & Improvements
 ENABLE_CACHE = os.getenv("ENABLE_CACHE", "true").lower() == "true"
 ENABLE_JIOSAAVN_FALLBACK = os.getenv("ENABLE_JIOSAAVN_FALLBACK", "true").lower() == "true"
@@ -71,6 +81,7 @@ ENABLE_COOKIE_AUTH = os.getenv("ENABLE_COOKIE_AUTH", "true").lower() == "true"
 ENABLE_STATS_TRACKING = os.getenv("ENABLE_STATS_TRACKING", "true").lower() == "true"
 AGGRESSIVE_MODE = os.getenv("AGGRESSIVE_MODE", "false").lower() == "true"
 AUTO_CLEANUP_DISABLED_FILES = os.getenv("AUTO_CLEANUP_DISABLED_FILES", "true").lower() == "true"
+ENABLE_EXPONENTIAL_BACKOFF = os.getenv("ENABLE_EXPONENTIAL_BACKOFF", "true").lower() == "true"
 
 # Logging & Monitoring
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
