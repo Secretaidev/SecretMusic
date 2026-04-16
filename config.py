@@ -48,6 +48,34 @@ TG_VIDEO_FILESIZE_LIMIT = int(os.getenv("TG_VIDEO_FILESIZE_LIMIT", 2145386496))
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", None)
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", None)
 
+# ═══════════════════════════════════════════════════════════════
+# Download Configuration (v2.1 Upgrades)
+# ═══════════════════════════════════════════════════════════════
+DOWNLOAD_RETRIES = int(os.getenv("DOWNLOAD_RETRIES", 3))
+FRAGMENT_RETRIES = int(os.getenv("FRAGMENT_RETRIES", 2))
+DOWNLOAD_TIMEOUT = int(os.getenv("DOWNLOAD_TIMEOUT", 30))
+MIN_FILE_SIZE = int(os.getenv("MIN_FILE_SIZE", 500000))  # 500KB - ensure complete files
+MAX_AUDIO_BITRATE = int(os.getenv("MAX_AUDIO_BITRATE", 192))  # kbps
+PREFERRED_AUDIO_FORMAT = os.getenv("PREFERRED_AUDIO_FORMAT", "mp3")
+
+# Performance Configuration
+MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", 3))
+CACHE_DURATION = int(os.getenv("CACHE_DURATION", 3600))  # 1 hour
+DISC_CLEANUP_INTERVAL = int(os.getenv("DISC_CLEANUP_INTERVAL", 21600))  # 6 hours
+MAX_CACHE_SIZE = int(os.getenv("MAX_CACHE_SIZE", 5368709120))  # 5GB
+
+# Feature Flags & Improvements
+ENABLE_CACHE = os.getenv("ENABLE_CACHE", "true").lower() == "true"
+ENABLE_JIOSAAVN_FALLBACK = os.getenv("ENABLE_JIOSAAVN_FALLBACK", "true").lower() == "true"
+ENABLE_COOKIE_AUTH = os.getenv("ENABLE_COOKIE_AUTH", "true").lower() == "true"
+ENABLE_STATS_TRACKING = os.getenv("ENABLE_STATS_TRACKING", "true").lower() == "true"
+AGGRESSIVE_MODE = os.getenv("AGGRESSIVE_MODE", "false").lower() == "true"
+AUTO_CLEANUP_DISABLED_FILES = os.getenv("AUTO_CLEANUP_DISABLED_FILES", "true").lower() == "true"
+
+# Logging & Monitoring
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+ENABLE_PERFORMANCE_LOGGING = os.getenv("ENABLE_PERFORMANCE_LOGGING", "true").lower() == "true"
+
 STRING1 = os.getenv("STRING_SESSION", None)
 STRING2 = os.getenv("STRING_SESSION2", None)
 STRING3 = os.getenv("STRING_SESSION3", None)

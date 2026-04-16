@@ -27,23 +27,51 @@
 
 
 import logging
+import os
+from datetime import datetime
 
+# Create logs directory
+os.makedirs("logs", exist_ok=True)
+
+# Enhanced logging format with more context
+LOG_FORMAT = "[%(asctime)s - %(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] - %(message)s"
+DATE_FORMAT = "%d-%b-%y %H:%M:%S"
+
+# File handler with rotation
+file_handler = logging.FileHandler(
+    f"logs/secretmusic_{datetime.now().strftime('%Y%m%d')}.log"
+)
+file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
+
+# Configure base logging
 logging.basicConfig(
     level=logging.INFO,
-    format="[%(asctime)s - %(levelname)s] - %(name)s - %(message)s",
-    datefmt="%d-%b-%y %H:%M:%S",
-    handlers=[
-        logging.FileHandler("log.txt"),
-        logging.StreamHandler(),
-    ],
+    format=LOG_FORMAT,
+    datefmt=DATE_FORMAT,
+    handlers=[file_handler, console_handler],
 )
 
-logging.getLogger("httpx").setLevel(logging.ERROR)
-logging.getLogger("pyrogram").setLevel(logging.ERROR)
-logging.getLogger("pytgcalls").setLevel(logging.ERROR)
+# Suppress verbose third-party loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("pyrogram").setLevel(logging.WARNING)
+logging.getLogger("pytgcalls").setLevel(logging.WARNING)
+logging.getLogger("yt_dlp").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 
 def LOGGER(name: str) -> logging.Logger:
+    """Get a logger instance with the given name.
+    
+    Args:
+        name: Logger name (typically __name__)
+    
+    Returns:
+        logging.Logger: Configured logger instance
+    """
     return logging.getLogger(name)
 
 

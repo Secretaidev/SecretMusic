@@ -21,7 +21,8 @@
 import asyncio
 import os
 import re
-from typing import Union
+from typing import Union, Tuple, Optional
+from pathlib import Path
 
 import aiohttp
 import yt_dlp
@@ -30,33 +31,82 @@ from pyrogram.types import Message
 from py_yt import VideosSearch, Playlist
 from SecretMusic.utils.formatters import time_to_seconds
 from SecretMusic import LOGGER
+from SecretMusic.utils.exceptions import (
+    DownloadError,
+    FormatNotFoundError,
+    VideoDeletedError,
+)
+import config
 
 API_URL = "https://secretsbotz.site"
 DOWNLOAD_DIR = "downloads"
 COOKIES_FILE = "cookies.txt"
 
 
-async def _ytdl_download(link: str, audio_only: bool = True) -> str:
-    """Fallback download using yt-dlp directly when API fails"""
+def _cleanup_old_files(max_age_hours: int = 24) -> None:
+    """Cleanup old downloaded files to manage disk space.
+    
+    Args:
+        max_age_hours: Remove files older than this many hours
+    """
+    if not config.AUTO_CLEANUP_DISABLED_FILES:
+        return
+    
+    try:
+        import time
+        current_time = time.time()
+        max_age_seconds = max_age_hours * 3600
+        
+        for filename in os.listdir(DOWNLOAD_DIR):
+            file_path = os.path.join(DOWNLOAD_DIR, filename)
+            if os.path.isfile(file_path):
+                file_age = current_time - os.path.getmtime(file_path)
+                if file_age > max_age_seconds:
+                    try:
+                        os.remove(file_path)
+                        LOGGER(__name__).debug(f"Cleaned up old file: {filename}")
+                    except Exception as e:
+                        LOGGER(__name__).warning(f"Failed to cleanup {filename}: {e}")
+    except Exception as e:
+        LOGGER(__name__).warning(f"File cleanup failed: {e}")
+
+
+async def _ytdl_download(link: str, audio_only: bool = True) -> Optional[str]:
+    """Download from YouTube using yt-dlp with multi-format fallback.
+    
+    Args:
+        link: YouTube URL or video ID
+        audio_only: If True, extract audio only. If False, download video.
+    
+    Returns:
+        Path to downloaded file or None if all attempts fail
+    """
     video_id = link.split('v=')[-1].split('&')[0] if 'v=' in link else link
     if not video_id or len(video_id) < 3:
-        return None
+        raise DownloadError("Invalid video ID", video_id)
+    
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    
+    # Periodic cleanup
+    _cleanup_old_files(max_age_hours=24)
+    
     ext = "mp3" if audio_only else "mp4"
     file_path = os.path.join(DOWNLOAD_DIR, f"{video_id}.{ext}")
-    if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+    
+    # Return cached file if exists and valid
+    if os.path.exists(file_path) and os.path.getsize(file_path) >= config.MIN_FILE_SIZE:
+        LOGGER(__name__).info(f"Using cached file for {video_id}")
         return file_path
 
     if "youtube.com" not in link and "youtu.be" not in link:
         link = f"https://www.youtube.com/watch?v={video_id}"
 
-    # Optimize: Only 2 format attempts to reduce server load
+    # Multiple format attempts with increasing permissiveness
     format_attempts = [
-        "bestaudio[ext=m4a]/bestaudio/ba/b",  # Primary - best audio format
-        "best",                                 # Fallback - anything that works
-    ] if audio_only else [
-        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
-        "best",
+        "bestaudio[ext=m4a]/bestaudio/ba/b" if audio_only else "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "ba/b" if audio_only else "best[ext=mp4]/best",
+        "best" if audio_only else "best",
+        "worst" if audio_only else "worst",
     ]
 
     try:
@@ -64,28 +114,35 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
     except RuntimeError:
         loop = asyncio.get_event_loop()
 
-    for format_option in format_attempts:
+    for attempt_num, format_option in enumerate(format_attempts, 1):
         try:
             opts = {
                 "format": format_option,
                 "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
-                "extractor_args": {"youtube": {"player_client": ["mweb"]}},  # Only mweb to reduce overhead
-                "quiet": True,  # Reduce logging overhead
+                "extractor_args": {"youtube": {"player_client": ["mweb", "web_safari", "ios"]}},
+                "quiet": False,
                 "nocheckcertificate": True,
                 "geo_bypass": True,
-                "no_warnings": True,  # Reduce logging
+                "no_warnings": False,
                 "noplaylist": True,
-                "retries": 1,  # Reduced from 3
-                "fragment_retries": 1,  # Reduced from 3
-                "socket_timeout": 8,  # Reduced from 10
-                "skip_unavailable_fragments": True,
+                "retries": config.DOWNLOAD_RETRIES,
+                "fragment_retries": config.FRAGMENT_RETRIES,
+                "socket_timeout": config.DOWNLOAD_TIMEOUT,
+                "skip_unavailable_fragments": False,  # Get complete audio
             }
+            
+            # Enable cookies for better access
+            if os.path.exists(COOKIES_FILE) and config.ENABLE_COOKIE_AUTH:
+                opts["cookiefile"] = COOKIES_FILE
+            
             if audio_only:
                 opts["postprocessors"] = [{
                     "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "128",  # Reduced bitrate to save bandwidth
+                    "preferredcodec": config.PREFERRED_AUDIO_FORMAT,
+                    "preferredquality": str(config.MAX_AUDIO_BITRATE),
                 }]
+            
+            LOGGER(__name__).info(f"Download attempt {attempt_num}/{len(format_attempts)} for {video_id}")
             
             await loop.run_in_executor(
                 None, lambda o=opts, l=link: yt_dlp.YoutubeDL(o).download([l])
@@ -94,12 +151,27 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
             # Check if download was successful
             for f in os.listdir(DOWNLOAD_DIR):
                 if f.startswith(video_id):
-                    result = os.path.join(DOWNLOAD_DIR, f)
-                    if os.path.exists(result) and os.path.getsize(result) > 100000:
-                        return result
-        except Exception:
+                    result_path = os.path.join(DOWNLOAD_DIR, f)
+                    file_size = os.path.getsize(result_path) if os.path.exists(result_path) else 0
+                    
+                    if file_size >= config.MIN_FILE_SIZE:
+                        LOGGER(__name__).info(f"✅ Downloaded {video_id} ({file_size / 1024 / 1024:.2f}MB)")
+                        return result_path
+                    else:
+                        LOGGER(__name__).warning(f"Downloaded file too small ({file_size} bytes), retrying...")
+                        try:
+                            os.remove(result_path)
+                        except:
+                            pass
+                        continue
+                            
+        except Exception as e:
+            error_msg = str(e)
+            LOGGER(__name__).debug(f"Format {format_option} failed for {video_id}: {error_msg}")
             continue
 
+    error_msg = f"All download attempts failed for {video_id}"
+    LOGGER(__name__).error(error_msg)
     return None
 
 

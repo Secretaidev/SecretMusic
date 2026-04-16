@@ -26,9 +26,58 @@
 #
 
 
+"""Custom exceptions for SecretMusic bot."""
+
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
+
 class AssistantErr(Exception):
+    """Base exception for assistant/streaming errors."""
     def __init__(self, errr: str):
         super().__init__(errr)
+        LOGGER.error(f"AssistantError: {errr}")
+
+
+class DownloadError(Exception):
+    """Raised when audio/video download fails."""
+    def __init__(self, message: str, video_id: str = None):
+        self.video_id = video_id
+        super().__init__(message)
+        LOGGER.error(f"DownloadError ({video_id}): {message}")
+
+
+class FormatNotFoundError(DownloadError):
+    """Raised when no suitable format is available."""
+    def __init__(self, video_id: str):
+        super().__init__(f"No suitable format found", video_id)
+
+
+class AgeRestrictedError(DownloadError):
+    """Raised when video is age-restricted."""
+    def __init__(self, video_id: str):
+        super().__init__(f"Video is age-restricted", video_id)
+
+
+class VideoDeletedError(DownloadError):
+    """Raised when video has been deleted."""
+    def __init__(self, video_id: str):
+        super().__init__(f"Video has been deleted", video_id)
+
+
+class DatabaseError(Exception):
+    """Raised for database operation failures."""
+    def __init__(self, operation: str, error: str):
+        super().__init__(f"Database {operation} failed: {error}")
+        LOGGER.error(f"DatabaseError ({operation}): {error}")
+
+
+class CacheError(Exception):
+    """Raised for caching operation failures."""
+    def __init__(self, operation: str, error: str):
+        super().__init__(f"Cache {operation} failed: {error}")
+        LOGGER.warning(f"CacheError ({operation}): {error}")
 
 
 
