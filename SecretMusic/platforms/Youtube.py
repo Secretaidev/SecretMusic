@@ -70,7 +70,11 @@ async def _ytdl_download(link: str, audio_only: bool = True) -> str:
         opts["cookiefile"] = COOKIES_FILE
 
     try:
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+            
         # First attempt with preferred formats
         await loop.run_in_executor(
             None, lambda: yt_dlp.YoutubeDL(opts).download([link])
