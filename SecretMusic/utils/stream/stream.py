@@ -26,6 +26,8 @@
 #
 
 
+import aiohttp
+import urllib.parse
 import os
 from random import randint
 from typing import Union
@@ -43,6 +45,21 @@ from SecretMusic.utils.pastebin import SecretBin
 from SecretMusic.utils.stream.queue import put_queue, put_queue_index
 from SecretMusic.utils.thumbnails import gen_thumb
 
+async def get_jiosaavn_link(query: str):
+    try:
+        query = urllib.parse.quote(query.replace(' lyrical', '').replace(' music video', '').replace(' audio', '').strip())
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"https://jiosaavn-api-privatecvc2.vercel.app/search/songs?query={query}", timeout=10) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    results = data.get("data", {}).get("results", [])
+                    if results and len(results) > 0:
+                        download_urls = results[0].get("downloadUrl", [])
+                        if download_urls:
+                            return download_urls[-1]["link"], True
+    except Exception:
+        pass
+    return None, None
 
 async def stream(
     _,
@@ -106,9 +123,11 @@ async def stream(
                         vidid, mystic, video=status, videoid=True
                     )
                 except:
-                    raise AssistantErr(_["play_14"])
+                    file_path, direct = await get_jiosaavn_link(title)
                 if not file_path:
-                    raise AssistantErr(_["play_14"])
+                    file_path, direct = await get_jiosaavn_link(title.split()[0])
+                    if not file_path:
+                        raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
                 await SecretCall.join_call(
                     chat_id,
                     original_chat_id,
@@ -179,9 +198,12 @@ async def stream(
                 vidid, mystic, videoid=True, video=status
             )
         except:
-            raise AssistantErr(_["play_14"])
+            # JioSaavn Fallback
+            file_path, direct = await get_jiosaavn_link(title)
         if not file_path:
-            raise AssistantErr(_["play_14"])
+            file_path, direct = await get_jiosaavn_link(title.split()[0])
+            if not file_path:
+                raise AssistantErr(_["play_14"] + "\n\n⚠️ **Youtube Blocked & JioSaavn Fallback Failed!**")
 
         if await is_active_chat(chat_id):
             await put_queue(
