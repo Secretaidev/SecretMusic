@@ -24,6 +24,7 @@
 import asyncio
 import importlib
 import os
+import time
 
 # Auto-update yt-dlp to latest on startup to bypass YouTube format signature errors and clear cache
 os.system("pip install -U yt-dlp")
@@ -104,7 +105,17 @@ async def init():
     except:
         pass
 
-    await app.start()
+    # Handle FloodWait on startup gracefully - wait instead of crashing
+    from pyrogram.errors import FloodWait
+    while True:
+        try:
+            await app.start()
+            break
+        except FloodWait as e:
+            wait_sec = e.value
+            LOGGER("SecretMusic").warning(f"Telegram FloodWait: Waiting {wait_sec} seconds before retrying login...")
+            await asyncio.sleep(wait_sec + 5)
+            continue
     
     await setup_bot_commands()
 
@@ -139,5 +150,16 @@ async def init():
     LOGGER("SecretMusic").info("Stopping Secret Music Bot...")
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(init())
+    from pyrogram.errors import FloodWait
+    while True:
+        try:
+            asyncio.get_event_loop().run_until_complete(init())
+            break
+        except FloodWait as e:
+            print(f"[FloodWait] Telegram login ban: Waiting {e.value} seconds...")
+            time.sleep(e.value + 5)
+            continue
+        except Exception as e:
+            print(f"[FATAL] Bot crashed: {e}")
+            break
 
